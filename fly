@@ -2,17 +2,16 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local lp = Players.LocalPlayer
 
--- GUI oluşturma fonksiyonu
-local function createGUI()
-    -- Daha önce oluşturulmuş mu kontrol et
-    if lp:FindFirstChild("PlayerGui"):FindFirstChild("XenoFlingV2") then
-        return
-    end
+-- Güvenli GUI kurulumu
+local function setupGUI()
+    -- Eski GUI varsa temizle (çakışma olmasın)
+    local existing = lp:FindFirstChild("PlayerGui") and lp.PlayerGui:FindFirstChild("XenoFlingV2")
+    if existing then existing:Destroy() end
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "XenoFlingV2"
-    ScreenGui.Parent = lp:WaitForChild("PlayerGui")  -- PlayerGui'ye ekle
-    ScreenGui.ResetOnSpawn = false  -- Karakter ölünce sıfırlanmasın
+    ScreenGui.Parent = lp:WaitForChild("PlayerGui")
+    ScreenGui.ResetOnSpawn = false
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Size = UDim2.new(0, 180, 0, 120)
@@ -55,31 +54,52 @@ local function createGUI()
     BtnCorner.CornerRadius = UDim.new(0, 8)
     BtnCorner.Parent = StatusBtn
 
-    -- Fling mantığı
+    -- Fling değişkenleri
     local active = false
-    local flingConnection = nil
+    local heartbeatConn = nil
+    local resetConn = nil
 
     local function stopFling()
-        if flingConnection then
-            flingConnection:Disconnect()
-            flingConnection = nil
+        if heartbeatConn then
+            heartbeatConn:Disconnect()
+            heartbeatConn = nil
         end
     end
 
     local function startFling()
-        if flingConnection then return end
-        flingConnection = RunService.Heartbeat:Connect(function()
+        if heartbeatConn then return end
+        
+        local lastFling = 0
+        heartbeatConn = RunService.Heartbeat:Connect(function(dt)
             if not active then return end
-            local char = lp.Character
-            if not char then return end
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hrp and hum and hum.Health > 0 then
-                -- Hızı uygula ve hemen geri al (ölmeyi engellemek için)
-                local oldVel = hrp.AssemblyLinearVelocity
-                hrp.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
-                task.wait()  -- Bir frame bekle
-                hrp.AssemblyLinearVelocity = oldVel
+            
+            lastFling = lastFling + dt
+            if lastFling >= 0.4 then  -- 0.4 saniyede bir uygula (daha seyrek)
+                lastFling = 0
+                
+                local char = lp.Character
+                if char then
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if hrp and hum and hum.Health > 0 then
+                        -- Eski hızı sakla
+                        local oldVel = hrp.AssemblyLinearVelocity
+                        
+                        -- Daha düşük ve rastgele kuvvet (havaya çok fırlatmaz)
+                        local force = Vector3.new(
+                            math.random(-4000, 4000),
+                            math.random(1000, 2500),  -- Yüksekliği iyice sınırla
+                            math.random(-4000, 4000)
+                        )
+                        hrp.AssemblyLinearVelocity = force
+                        
+                        -- Kısa süre sonra eski hıza dön (çarpma anını yumuşat)
+                        task.wait(0.15)
+                        if hrp and hrp.Parent then
+                            hrp.AssemblyLinearVelocity = oldVel
+                        end
+                    end
+                end
             end
         end)
     end
@@ -93,6 +113,14 @@ local function createGUI()
             startFling()
         else
             stopFling()
+            -- Kapatınca karakteri durdur (opsiyonel, isteğe bağlı)
+            local char = lp.Character
+            if char then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                end
+            end
         end
     end
 
@@ -102,11 +130,12 @@ local function createGUI()
     lp.CharacterAdded:Connect(function()
         if active then
             stopFling()
+            task.wait(0.5)  -- Karakter tam oluşsun
             startFling()
         end
     end)
 
-    -- GUI kapandığında bağlantıyı temizle
+    -- GUI kapanırken temizlik
     ScreenGui.Destroying:Connect(function()
         stopFling()
     end)
@@ -114,24 +143,24 @@ local function createGUI()
     -- Bildirim
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "Xeno Fling V2",
-        Text = "Arayüz Yüklendi!",
-        Duration = 5
+        Text = "Güvenli mod çalışıyor",
+        Duration = 4
     })
 end
 
--- LocalPlayer hazır olduğunda GUI'yi oluştur
+-- LocalPlayer hazır mı kontrol et, değilse bekle
 if lp then
-    createGUI()
+    setupGUI()
 else
     Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
     lp = Players.LocalPlayer
-    createGUI()
+    setupGUI()
 end
 
--- Nadiren LocalPlayer değişirse (örneğin teleport) yeniden oluştur
+-- Teleport gibi durumlarda (nadiren) yeniden dene
 Players:GetPropertyChangedSignal("LocalPlayer"):Connect(function()
     lp = Players.LocalPlayer
     if lp then
-        createGUI()
+        setupGUI()
     end
 end)
