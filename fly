@@ -1,82 +1,87 @@
--- Modern Tasarım & Gelişmiş Fling Script
-local ScreenGui = Instance.new("ScreenGui")
-local MainFrame = Instance.new("Frame")
-local UICorner = Instance.new("UICorner")
-local Title = Instance.new("TextLabel")
-local ToggleBtn = Instance.new("TextButton")
-local UIStroke = Instance.new("UIStroke")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local lp = Players.LocalPlayer
 
--- UI Ayarları
-ScreenGui.Parent = game.CoreGui -- Resetlendiğinde gitmemesi için CoreGui
+-- UI OLUŞTURMA
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "XenoFlingV2"
+ScreenGui.Parent = game.CoreGui
 ScreenGui.ResetOnSpawn = false
 
-MainFrame.Name = "ModernFling"
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-MainFrame.Position = UDim2.new(0.5, -75, 0.5, -50)
-MainFrame.Size = UDim2.new(0, 150, 0, 100)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 180, 0, 120)
+MainFrame.Position = UDim2.new(0.5, -90, 0.5, -60)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
 
-UICorner.CornerRadius = UDim.new(0, 10)
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
 UICorner.Parent = MainFrame
 
-UIStroke.Color = Color3.fromRGB(60, 60, 60)
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(0, 170, 255) -- Neon Mavi Kenarlık
 UIStroke.Thickness = 2
 UIStroke.Parent = MainFrame
 
-Title.Parent = MainFrame
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "TOUCH FLING"
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "XENO FLING V2"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
+Title.TextSize = 16
 Title.BackgroundTransparency = 1
+Title.Parent = MainFrame
 
-ToggleBtn.Parent = MainFrame
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
-ToggleBtn.Size = UDim2.new(0.8, 0, 0, 35)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-ToggleBtn.Text = "DURUM: OFF"
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 60, 60)
-ToggleBtn.Font = Enum.Font.GothamSemibold
-ToggleBtn.TextSize = 12
+local StatusBtn = Instance.new("TextButton")
+StatusBtn.Size = UDim2.new(0.8, 0, 0, 40)
+StatusBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
+StatusBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+StatusBtn.Text = "DURUM: KAPALI"
+StatusBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+StatusBtn.Font = Enum.Font.GothamSemibold
+StatusBtn.TextSize = 13
+StatusBtn.Parent = MainFrame
 
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 6)
-btnCorner.Parent = ToggleBtn
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 8)
+BtnCorner.Parent = StatusBtn
 
--- Fling Mantığı
-local lp = game.Players.LocalPlayer
-local RS = game:GetService("RunService")
+-- FLING MANTIĞI (ÖLME ENGELLEMELİ)
 local active = false
-
-local function startFling()
-    while active do
-        RS.Heartbeat:Wait()
-        local char = lp.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-
-        if hrp and hum then
-            -- Karakterin ölmesini engellemek için sadece Velocity ile oynuyoruz
-            -- AssemblyLinearVelocity modern yöntemdir
-            local oldVel = hrp.AssemblyLinearVelocity
-            hrp.AssemblyLinearVelocity = Vector3.new(10000, 10000, 10000) 
-            RS.RenderStepped:Wait()
-            hrp.AssemblyLinearVelocity = oldVel
-        end
+local function toggleFling()
+    active = not active
+    StatusBtn.Text = active and "DURUM: AÇIK" or "DURUM: KAPALI"
+    StatusBtn.TextColor3 = active and Color3.fromRGB(50, 255, 150) or Color3.fromRGB(255, 50, 50)
+    
+    if active then
+        task.spawn(function()
+            while active do
+                RunService.Heartbeat:Wait()
+                local char = lp.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                
+                if hrp and hum then
+                    -- Ölmeni engelleyen ana kısım: Hızı sadece çok kısa bir an uygula
+                    -- ve karakterin yere çakılmasını engellemek için Y eksenini koru
+                    local oldVel = hrp.AssemblyLinearVelocity
+                    hrp.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
+                    RunService.RenderStepped:Wait()
+                    hrp.AssemblyLinearVelocity = oldVel
+                end
+            end
+        end)
     end
 end
 
-ToggleBtn.MouseButton1Click:Connect(function()
-    active = not active
-    if active then
-        ToggleBtn.Text = "DURUM: ON"
-        ToggleBtn.TextColor3 = Color3.fromRGB(60, 255, 60)
-        task.spawn(startFling)
-    else
-        ToggleBtn.Text = "DURUM: OFF"
-        ToggleBtn.TextColor3 = Color3.fromRGB(255, 60, 60)
-    end
-end)
+StatusBtn.MouseButton1Click:Connect(toggleFling)
+
+-- Bildirim
+game:GetService("StarterGui"):SetCore("SendNotification", {
+	Title = "Xeno Fling";
+	Text = "Arayüz Yüklendi!";
+	Duration = 5;
+})
